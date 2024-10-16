@@ -1,0 +1,33 @@
+<table>
+    <tr>
+<th>Game ID <button onclick="sortTable('GameID')">Sort</button></th>
+<th>Game Name <button onclick="sortTable('GameName')">Sort</button></th>
+<th>How Long to Beat <button onclick="sortTable('HowLongToBeat')">Sort</button></th>
+<!-- <th>Progress Status <button onclick="sortTable('ProgressStatus')">Sort</button></th> -->
+<th>Progress Status <button onclick="sortProgressStatus()">Sort</button></th>
+<!-- <th>Proton Version <button onclick="sortTable('ProtonVersion')">Sort</button></th> -->
+<th>Delete</th>
+
+    </tr>
+    {% for game in games %}
+<tr class="status-{{ game[3].replace(' ', '-').lower() }}">
+
+        <td>{{ game[0] }}</td>
+        <td>{{ game[1] }}</td>
+        <td>{{ game[2] }}</td> <!-- Display actual HowLongToBeat value -->
+<!-- Inside the for loop for each game -->
+<td>
+    <select onchange="updateProgressStatus({{ game[0] }}, this.value)">
+        <option value="Not Started" {% if game[3] == 'Not Started' %}selected{% endif %}>Not Started</option>
+        <option value="In Progress" {% if game[3] == 'In Progress' %}selected{% endif %}>In Progress</option>
+        <option value="Complete" {% if game[3] == 'Complete' %}selected{% endif %}>Complete</option>
+        <option value="Tabled" {% if game[3] == 'Tabled' %}selected{% endif %}>Tabled</option>
+    </select>
+</td>
+
+        <!-- <td>{{ game[4] }}</td> <!-- Display actual ProtonVersion value -->
+    <td><button onclick="deleteGame({{ game[0] }})" style="color: red;">X</button></td>
+
+    </tr>
+    {% endfor %}
+</table>

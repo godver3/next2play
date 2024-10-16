@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next2Play</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+
+.header-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    position: relative;
+    padding-top: 20px;
+}
+
+        .current-game-container {
+            width: 250px;
+            position: absolute;
+            left: 15%;
+            top: 0;
+            height: 400px; /* Changed from 300px to 400px */
+        }
+
+.main-header {
+    text-align: center;
+}
+
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        #game-form {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 5px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #filters {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            background-color: #333;
+            margin: 0 5px;
+        }
+
+        .filter-btn.active {
+            background-color: #4CAF50;
+        }
+
+#game-grid {
+    clear: both; /* Ensures the grid starts below the current game card */
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+}
+
+
+        .current-game-card {
+            background: #1a5f7a;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            height: 400px; /* Changed from 350px to 400px */
+            width: 0px;
+        }
+
+        .game-card:hover {
+            transform: scale(1);
+        }
+
+        .game-card.status-in-progress {
+            background: #1a5f7a;
+        }
+
+        .game-card.status-complete {
+            background: #2d4f35;
+        }
+
+        .game-card.status-tabled {
+            background: #4f2d2d;
+        }
+
+.game-card {
+    background: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 450px;
+}
+
+.game-poster {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+}
+
+.game-info {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.game-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+    max-height: 2.4em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.game-hltb {
+    font-size: 0.9em;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+
+select {
+    width: 100%    padding: 5px;
+    margin-top: auto;
+    background-color: #333;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+.delete-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-top: 5px;
+    width: 80%;
+    align}
+
+        #notificationBar {
+            display: none;
+            position: fixed;
+            top: -50px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            padding: 10px;
+            font-size: 17px;
+            z-index: 1001;
+            transition: top 0.5s ease-in-out;
+        }
+
+        .notificationSuccess { background-color: #4CAF50; }
+        .notificationError { background-color: #f44336; }
+        .notificationDuplicate { background-color: #2196F3; }
+        .notificationDelete { background-color: #FF5722; }
+        .notificationRandom { background-color: #FFD700; }
+        .notificationUpdate { background-color: #9C27B0; }
+        .notificationInfo { background-color: #2196F3; }
+
+
+@media (max-width: 1600px) {
+    .current-game-card {
+         width: 0px;
+    }
+
+.header-container {
+    margin-bottom: 20px;
+}
+
+}
+
+@media (max-width: 768px) {
+    #game-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+
+    .game-card {
+        min-height: 350px;
+    }
+}
+    </style>
+</head>
+<body>
+    <div id="notificationBar"></div>
+
+    <div class="header-container">
+        <div class="current-game-container">
+            <div id="currentGameCard" class="current-game-card"></div>
+        </div>
+        <div class="main-header">
+            <h1>Next2Play</h1>
+            <div id="game-form">
+                <input type="text" id="GameName" name="GameName" placeholder="Enter game name" required>
+                <button onclick="submitGameForm()">Add Game</button>
+                <button onclick="getRandomGame()">Random Game</button>
+                <button onclick="updateGames()">Update Games</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-grid">
+        {% for game in games %}
+        <div class="game-card status-{{ game['ProgressStatus'].replace(' ', '-').lower() }}" data-game-id="{{ game['GameID'] }}">
+            <img src="{{ game['ImageURL'] }}" alt="{{ game['GameName'] }}" class="game-poster">
+            <div class="game-info">
+                <div class="game-title">{{ game['GameName'] }}</div>
+                <div class="game-hltb">How Long to Beat: {{ game['HowLongToBeat'] }}</div>
+                <select onchange="updateProgressStatus({{ game['GameID'] }}, this.value)">
+                    <option value="Not Started" {% if game['ProgressStatus'] == 'Not Started' %}selected{% endif %}>Not Started</option>
+                    <option value="In Progress" {% if game['ProgressStatus'] == 'In Progress' %}selected{% endif %}>In Progress</option>
+                    <option value="Complete" {% if game['ProgressStatus'] == 'Complete' %}selected{% endif %}>Complete</option>
+                    <option value="Tabled" {% if game['ProgressStatus'] == 'Tabled' %}selected{% endif %}>Tabled</option>
+                </select>
+                <button class="delete-btn" onclick="deleteGame({{ game['GameID'] }})">Delete</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        let games = [
+            {% for game in games %}
+            {
+                GameID: {{ game['GameID'] }},
+                GameName: "{{ game['GameName'] }}",
+                ImageURL: "{{ game['ImageURL'] }}",
+                HowLongToBeat: "{{ game['HowLongToBeat'] }}",
+                ProgressStatus: "{{ game['ProgressStatus'] }}"
+            },
+            {% endfor %}
+        ];
+
+        function renderGames() {
+            const gameGrid = document.getElementById('game-grid');
+            gameGrid.innerHTML = '';
+
+            games.forEach(game => {
+                const gameCard = document.createElement('div');
+                gameCard.className = `game-card status-${game.ProgressStatus.replace(' ', '-').toLowerCase()}`;
+                gameCard.dataset.gameId = game.GameID;
+
+                gameCard.innerHTML = `
+                    <img src="${game.ImageURL}" alt="${game.GameName}" class="game-poster">
+                    <div class="game-info">
+                        <div class="game-title">${game.GameName}</div>
+                        <div class="game-hltb">How Long to Beat: ${game.HowLongToBeat}</div>
+                        <select onchange="updateProgressStatus(${game.GameID}, this.value)">
+                            <option value="Not Started" ${game.ProgressStatus === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                            <option value="In Progress" ${game.ProgressStatus === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Complete" ${game.ProgressStatus === 'Complete' ? 'selected' : ''}>Complete</option>
+                            <option value="Tabled" ${game.ProgressStatus === 'Tabled' ? 'selected' : ''}>Tabled</option>
+                        </select>
+                        <button class="delete-btn" onclick="deleteGame(${game.GameID})">Delete</button>
+                    </div>
+                `;
+
+                gameGrid.appendChild(gameCard);
+            });
+        }
+
+        function sortGames() {
+            games.sort((a, b) => {
+                if (a.ProgressStatus === 'In Progress' && b.ProgressStatus !== 'In Progress') return -1;
+                if (a.ProgressStatus !== 'In Progress' && b.ProgressStatus === 'In Progress') return 1;
+                return a.GameName.localeCompare(b.GameName);
+            });
+        }
+
+
+        let activeFilters = new Set(['all']);
+
+        function submitGameForm() {
+            var gameName = document.getElementById('GameName').value;
+            var formData = new FormData();
+            formData.append('GameName', gameName);
+
+            fetch('/add_game', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.status === 200) {
+                    return response.text().then(data => {
+                        showNotification(data, 'success');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 3000);
+                    });
+                } else if (response.status === 409) {
+                    return response.text().then(data => {
+                        showNotification(data, 'duplicate');
+                    });
+                } else {
+                    return response.text().then(data => {
+                        showNotification(data, 'error');
+                    });
+                }
+            });
+        }
+
+        // Modify the existing functions to use the new games array
+        function deleteGame(gameId) {
+            if (confirm('Are you sure you want to delete this game?')) {
+                fetch('/delete_game/' + gameId, { method: 'DELETE' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            games = games.filter(game => game.GameID !== gameId);
+                            sortGames();
+                            renderGames();
+                            showNotification(data.message, 'delete');
+                            updateCurrentGame();
+                            applyFilters();
+                        } else {
+                            showNotification(data.message, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification('An error occurred while deleting the game', 'error');
+                    });
+            }
+        }
+
+        function updateProgressStatus(gameId, newStatus) {
+            fetch('/update_status/' + gameId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: newStatus })
+            }).then(response => response.json())
+              .then(data => {
+                  const gameIndex = games.findIndex(game => game.GameID === gameId);
+                  if (gameIndex !== -1) {
+                      games[gameIndex].ProgressStatus = newStatus;
+                  }
+                  sortGames();
+                  renderGames();
+                  showNotification(data.message, 'success');
+                  updateCurrentGame();
+                  applyFilters();
+              });
+        }
+
+
+        function getRandomGame() {
+            fetch('/random_game')
+                .then(response => response.json())
+                .then(data => {
+                    showNotification('☢️ ' + data.gameName + ' ☢️', 'random', 10000);
+                });
+        }
+
+function updateGames() {
+    fetch('/update_games', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            showNotification(data.message, data.message.startsWith('Updated') ? 'update' : 'info');
+            if (data.message.startsWith('Updated')) {
+                fetchUpdatedGames();
+            }
+        })
+        .catch(error => {
+            console.error('Error updating games:', error);
+            showNotification('Error updating games. Please try again.', 'error');
+        });
+}
+
+function fetchUpdatedGames() {
+    fetch('/?ajax=1')  // Add a query parameter to indicate this is an AJAX request
+        .then(response => response.json())  // Expect a JSON response instead of HTML
+        .then(updatedGames => {
+            if (Array.isArray(updatedGames)) {
+                games = updatedGames;
+                sortGames();
+                renderGames();
+                applyFilters();
+                updateCurrentGame();
+                showNotification('Games updated successfully', 'success');
+            } else {
+                throw new Error('Invalid data received from server');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching updated games:', error);
+            showNotification('Error updating games. Please refresh the page.', 'error');
+        });
+}
+
+        function showNotification(message, type, duration = 3000) {
+            var bar = document.getElementById("notificationBar");
+            bar.innerText = message;
+            bar.className = 'notificationBar';
+            bar.classList.add('notification' + type.charAt(0).toUpperCase() + type.slice(1));
+            bar.style.display = "block";
+            setTimeout(function() {
+                bar.style.top = "0";
+                setTimeout(function() {
+                    bar.style.top = "-50px";
+                    setTimeout(function() {
+                        bar.style.display = "none";
+                    }, 500);
+                }, duration);
+            }, 10);
+        }
+
+function updateCurrentGame() {
+    fetch('/in_progress_game')
+        .then(response => response.json())
+        .then(data => {
+            const currentGameCard = document.getElementById('currentGameCard');
+            if (data.game) {
+                currentGameCard.innerHTML = `
+                    <img src="${data.game.ImageURL}" alt="${data.game.GameName}" class="game-poster">
+                    <div class="game-info">
+                        <div class="game-title">${data.game.GameName}</div>
+                        <div class="game-hltb">How Long to Beat: ${data.game.HowLongToBeat}</div>
+                    </div>
+                `;
+                currentGameCard.className = 'current-game-card status-in-progress';
+            } else {
+                currentGameCard.innerHTML = '<div class="game-info"><div class="game-title">No Game in Progress</div></div>';
+                currentGameCard.className = 'current-game-card';
+            }
+        });
+}
+
+        function toggleFilter(filter) {
+            if (filter === 'all') {
+                activeFilters.clear();
+                activeFilters.add('all');
+            } else {
+                activeFilters.delete('all');
+                if (activeFilters.has(filter)) {
+                    activeFilters.delete(filter);
+                    if (activeFilters.size === 0) {
+                        activeFilters.add('all');
+                    }
+                } else {
+                    activeFilters.add(filter);
+                }
+            }
+            updateFilterButtons();
+            applyFilters();
+            saveFilters();
+        }
+
+        function updateFilterButtons() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const filter = btn.textContent.toLowerCase().replace(' ', '-');
+                btn.classList.toggle('active', activeFilters.has(filter) || activeFilters.has('all'));
+            });
+        }
+
+        function applyFilters() {
+            const games = document.querySelectorAll('.game-card');
+            games.forEach(game => {
+                if (activeFilters.has('all')) {
+                    game.style.display = '';
+                } else {
+                    const status = game.className.split(' ').find(c => c.startsWith('status-')).replace('status-', '');
+                    game.style.display = activeFilters.has(status) ? '' : 'none';
+                }
+            });
+        }
+
+        function saveFilters() {
+            localStorage.setItem('activeFilters', JSON.stringify(Array.from(activeFilters)));
+        }
+
+        function loadFilters() {
+            const savedFilters = localStorage.getItem('activeFilters');
+            if (savedFilters) {
+                activeFilters = new Set(JSON.parse(savedFilters));
+                updateFilterButtons();
+                applyFilters();
+            }
+        }
+
+        // Initial setup
+
+        // Initial setup
+        sortGames();
+        renderGames();
+        updateCurrentGame();
+        loadFilters();
+    </script>
+</body>
+</html>
