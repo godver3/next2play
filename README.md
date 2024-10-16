@@ -2,6 +2,8 @@
 
 A Flask-based web application to manage your video game backlog. Keep track of games you want to play, their completion status, and how long they take to beat. Uses howlongtobeatpy to fetch game information from HLTB.com. Intented to be simple and no-frills.
 
+![image](https://github.com/user-attachments/assets/73f7ee29-1a54-417f-af6a-f4f72d8396c9)
+
 ## Features
 
 - Add games to your backlog
@@ -9,6 +11,8 @@ A Flask-based web application to manage your video game backlog. Keep track of g
 - Update game statuses (Not Started, In Progress, Completed)
 - Get suggestions for random games to play
 - View currently in-progress games
+
+![image](https://github.com/user-attachments/assets/ab8a9831-321e-49f9-9f24-649d67804273)
 
 ## Setup
 
