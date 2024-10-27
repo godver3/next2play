@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the current directory contents into the container at /app
 COPY app.py /app/app.py
 COPY templates/index.html /app/templates/index.html
-COPY hltbSearch.js /app/hltbSearch.js
+#COPY hltbSearch.js /app/hltbSearch.js
 COPY node_modules /app/node_modules
 
 # Make port 5000 available to the world outside this container
