@@ -481,7 +481,7 @@ select {
                             sortGames();
                             renderGames();
                             showNotification(data.message, 'delete');
-                            updateCurrentGame();
+                            // updateCurrentGame();
                             applyFilters();
                         } else {
                             showNotification(data.message, 'error');
@@ -510,7 +510,7 @@ select {
                   sortGames();
                   renderGames();
                   showNotification(data.message, 'success');
-                  updateCurrentGame();
+                  // updateCurrentGame();
                   applyFilters();
               });
         }
@@ -555,7 +555,7 @@ function fetchUpdatedGames() {
                 sortGames();
                 renderGames();
                 applyFilters();
-                updateCurrentGame();
+                // updateCurrentGame();
                 showNotification('Games updated successfully', 'success');
             } else {
                 throw new Error('Invalid data received from server');
@@ -662,7 +662,7 @@ function updateCurrentGame() {
         // Initial setup
         sortGames();
         renderGames();
-        updateCurrentGame();
+        // updateCurrentGame();
         loadFilters();
     </script>
 </body>
