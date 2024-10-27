@@ -124,6 +124,7 @@
     flex-direction: column;
     height: auto;
     min-height: 450px;
+    position: relative;
 }
 
 .game-poster {
@@ -219,6 +220,76 @@ select {
         min-height: 350px;
     }
 }
+
+.release-year {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    z-index: 1;
+}
+
+.popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.popup-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #1e1e1e;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 80%;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1001;
+}
+
+.game-option {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+}
+
+.game-option:hover {
+    background-color: #2a2a2a;
+}
+
+.game-option img {
+    width: 50px;
+    height: 70px;
+    object-fit: cover;
+    margin-right: 15px;
+}
+
+.game-option-info {
+    flex-grow: 1;
+}
+
+.game-option-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.game-option-year {
+    font-size: 0.8em;
+    color: #aaa;
+}
     </style>
 </head>
 <body>
@@ -239,6 +310,9 @@ select {
     <div id="game-grid">
         {% for game in games %}
         <div class="game-card status-{{ game['ProgressStatus'].replace(' ', '-').lower() }}" data-game-id="{{ game['GameID'] }}">
+            {% if game['ReleaseYear'] %}
+            <div class="release-year">{{ game['ReleaseYear'] }}</div>
+            {% endif %}
             <img src="{{ game['ImageURL'] }}" alt="{{ game['GameName'] }}" class="game-poster">
             <div class="game-info">
                 <div class="game-title">{{ game['GameName'] }}</div>
@@ -255,6 +329,14 @@ select {
         {% endfor %}
     </div>
 
+    <div class="popup-overlay" id="gameSelectionPopup">
+        <div class="popup-content">
+            <h2>Select Game Version</h2>
+            <div id="gameOptions"></div>
+            <button onclick="closeGameSelection()">Cancel</button>
+        </div>
+    </div>
+
     <script>
         let games = [
             {% for game in games %}
@@ -263,7 +345,8 @@ select {
                 GameName: "{{ game['GameName'] }}",
                 ImageURL: "{{ game['ImageURL'] }}",
                 HowLongToBeat: "{{ game['HowLongToBeat'] }}",
-                ProgressStatus: "{{ game['ProgressStatus'] }}"
+                ProgressStatus: "{{ game['ProgressStatus'] }}",
+                ReleaseYear: {{ game['ReleaseYear'] if game['ReleaseYear'] else 'null' }}
             },
             {% endfor %}
         ];
@@ -278,6 +361,7 @@ select {
                 gameCard.dataset.gameId = game.GameID;
 
                 gameCard.innerHTML = `
+                    ${game.ReleaseYear ? `<div class="release-year">${game.ReleaseYear}</div>` : ''}
                     <img src="${game.ImageURL}" alt="${game.GameName}" class="game-poster">
                     <div class="game-info">
                         <div class="game-title">${game.GameName}</div>
@@ -309,30 +393,81 @@ select {
 
         function submitGameForm() {
             var gameName = document.getElementById('GameName').value;
+            
+            fetch('/search_games', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ GameName: gameName })
+            })
+            .then(response => response.json())
+            .then(results => {
+                if (results.length > 0) {
+                    showGameSelectionPopup(results);
+                } else {
+                    showNotification('No games found', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error searching for games', 'error');
+            });
+        }
+
+        function showGameSelectionPopup(games) {
+            const popup = document.getElementById('gameSelectionPopup');
+            const optionsContainer = document.getElementById('gameOptions');
+            optionsContainer.innerHTML = '';
+
+            games.forEach(game => {
+                const option = document.createElement('div');
+                option.className = 'game-option';
+                option.innerHTML = `
+                    <img src="${game.game_image_url || ''}" alt="${game.game_name}">
+                    <div class="game-option-info">
+                        <div class="game-option-title">${game.game_name}</div>
+                        <div class="game-option-year">${game.release_world || 'Year unknown'}</div>
+                    </div>
+                `;
+                option.onclick = () => selectGame(game);
+                optionsContainer.appendChild(option);
+            });
+
+            popup.style.display = 'block';
+        }
+
+        function closeGameSelection() {
+            document.getElementById('gameSelectionPopup').style.display = 'none';
+        }
+
+        function selectGame(gameInfo) {
             var formData = new FormData();
-            formData.append('GameName', gameName);
+            formData.append('GameName', gameInfo.game_name);
+            formData.append('GameID', gameInfo.game_id);
+            formData.append('ReleaseYear', gameInfo.release_world || '');
+            formData.append('HowLongToBeat', gameInfo.main_story || 0);
 
             fetch('/add_game', {
                 method: 'POST',
                 body: formData
-            }).then(response => {
+            })
+            .then(response => {
                 if (response.status === 200) {
-                    return response.text().then(data => {
-                        showNotification(data, 'success');
-                        setTimeout(() => {
-                            location.reload();
-                        }, 3000);
-                    });
+                    showNotification('Game added successfully', 'success');
+                    setTimeout(() => location.reload(), 3000);
                 } else if (response.status === 409) {
-                    return response.text().then(data => {
-                        showNotification(data, 'duplicate');
-                    });
+                    showNotification('This version of the game already exists in your collection', 'duplicate');
                 } else {
-                    return response.text().then(data => {
-                        showNotification(data, 'error');
-                    });
+                    showNotification('Error adding game', 'error');
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error adding game', 'error');
             });
+
+            closeGameSelection();
         }
 
         // Modify the existing functions to use the new games array
@@ -405,11 +540,18 @@ function updateGames() {
 }
 
 function fetchUpdatedGames() {
-    fetch('/?ajax=1')  // Add a query parameter to indicate this is an AJAX request
-        .then(response => response.json())  // Expect a JSON response instead of HTML
+    fetch('/?ajax=1')
+        .then(response => response.json())
         .then(updatedGames => {
             if (Array.isArray(updatedGames)) {
-                games = updatedGames;
+                games = updatedGames.map(game => ({
+                    GameID: game.GameID,
+                    GameName: game.GameName,
+                    ImageURL: game.ImageURL,
+                    HowLongToBeat: game.HowLongToBeat,
+                    ProgressStatus: game.ProgressStatus,
+                    ReleaseYear: game.ReleaseYear || null
+                }));
                 sortGames();
                 renderGames();
                 applyFilters();
