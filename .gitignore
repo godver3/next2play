@@ -5,3 +5,5 @@ node*
 venv*
 games_data.json
 update.sh
+static/game_images/*
+!static/game_images/.gitkeep

@@ -29,6 +29,7 @@ docker run -d \
   --name next2play \
   -p 5015:5015 \
   -v /path/to/games_data.json:/app/games_data.json \
+  -v /path/to/game_images:/app/static/game_images \
   godver3/next2play:latest
 ```
 

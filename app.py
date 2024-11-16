@@ -4,16 +4,74 @@ import random
 import subprocess
 import logging
 from howlongtobeatpy import HowLongToBeat
+import os
+import requests
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
 def load_games():
     with open('games_data.json', 'r') as f:
-        return json.load(f)
+        games = json.load(f)
+        # Format display times while keeping original data
+        for game in games:
+            if game['HowLongToBeat'] != "Unreleased":
+                try:
+                    # Store original time in a new field if needed
+                    game['HowLongToBeatRaw'] = game['HowLongToBeat']
+                    # Round for display
+                    game['HowLongToBeat'] = str(round(float(game['HowLongToBeat'])))
+                except (ValueError, TypeError):
+                    # Keep original value if conversion fails
+                    pass
+        return games
 
 def save_games(games):
     with open('games_data.json', 'w') as f:
         json.dump(games, f, indent=2)
+
+def download_and_cache_image(image_url, game_id):
+    """Download and cache an image locally"""
+    if not image_url:
+        return ''
+    
+    logging.info(f"Attempting to cache image for game {game_id} from {image_url}")
+    
+    # Create cache directory if it doesn't exist
+    cache_dir = os.path.join('static', 'game_images')
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    # Get file extension from URL
+    parsed_url = urlparse(image_url)
+    ext = os.path.splitext(parsed_url.path)[1] or '.jpg'
+    
+    # Create local filename
+    local_filename = f'game_{game_id}{ext}'
+    local_path = os.path.join(cache_dir, local_filename)
+    relative_path = f'/static/game_images/{local_filename}'
+    
+    logging.info(f"Local path will be: {local_path}")
+    
+    # If file doesn't exist, download it
+    if not os.path.exists(local_path):
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://howlongtobeat.com/'
+            }
+            response = requests.get(image_url, headers=headers)
+            response.raise_for_status()
+            with open(local_path, 'wb') as f:
+                f.write(response.content)
+        except Exception as e:
+            logging.error(f"Error downloading image {image_url}: {e}")
+            return image_url  # Return original URL if download fails
+    
+    # Return the local path relative to static directory
+    return f'/static/game_images/{local_filename}'
 
 @app.route('/')
 def index():
@@ -74,14 +132,23 @@ def add_game():
                 if existing_game:
                     return 'Duplicate game found', 409
                 else:
+                    # Cache the image locally
+                    cached_image_url = download_and_cache_image(image_url, game_id)
+                    logging.info(f"Original image URL: {image_url}")
+                    logging.info(f"Cached image URL: {cached_image_url}")
+                    
                     new_game = {
                         "GameID": game_id,
                         "GameName": game_name,
                         "HowLongToBeat": how_long_to_beat,
                         "ProgressStatus": "Not Started",
-                        "ImageURL": image_url,
+                        "ImageURL": cached_image_url,  # Make sure we're using the cached URL
                         "ReleaseYear": release_year
                     }
+                    
+                    # Before saving to JSON, log the game data
+                    logging.info(f"Saving game with data: {new_game}")
+                    
                     games.append(new_game)
                     save_games(games)
                     return 'Game added successfully', 200
@@ -98,47 +165,52 @@ def update_games():
     try:
         games = load_games()
         updated_count = 0
+        cached_count = 0
         
         for game in games:
-            # Check if game needs updating
-            needs_update = (
-                game['HowLongToBeat'] == "Unreleased" or
-                'ReleaseYear' not in game or 
-                not game['ReleaseYear'] or
-                'ImageURL' not in game or
-                not game['ImageURL']
-            )
+            # Check if we need to cache the image
+            if game['ImageURL'] and game['ImageURL'].startswith('http'):
+                logging.info(f"Caching image for {game['GameName']}")
+                cached_url = download_and_cache_image(game['ImageURL'], game['GameID'])
+                if cached_url and not cached_url.startswith('http'):
+                    game['ImageURL'] = cached_url
+                    cached_count += 1
             
-            if needs_update:
-                results = HowLongToBeat().search(game['GameName'])
-                if results:
-                    # Find the matching game by ID
-                    game_info = next((result for result in results 
-                                    if result.game_id == game['GameID']), results[0])
-                    
-                    # Update HowLongToBeat if it was "Unreleased"
-                    if game['HowLongToBeat'] == "Unreleased" and game_info.main_story > 0:
-                        game['HowLongToBeat'] = round(game_info.main_story)
-                        updated_count += 1
-                    
-                    # Update or add release year if missing
-                    if ('ReleaseYear' not in game or not game['ReleaseYear']) and hasattr(game_info, 'release_world'):
-                        game['ReleaseYear'] = game_info.release_world
-                        updated_count += 1
-                    
-                    # Update or add image URL if missing
-                    if ('ImageURL' not in game or not game['ImageURL']) and hasattr(game_info, 'game_image_url'):
-                        game['ImageURL'] = game_info.game_image_url
-                        updated_count += 1
-
-        if updated_count > 0:
-            save_games(games)
+            # Check for game updates from HLTB
+            results = HowLongToBeat().search(game['GameName'])
+            if results and len(results) > 0:
+                game_info = results[0]  # Get the first match
+                needs_update = False
+                
+                # Update HLTB time if different
+                if hasattr(game_info, 'main_story') and str(game_info.main_story) != str(game['HowLongToBeat']):
+                    game['HowLongToBeat'] = str(game_info.main_story)
+                    needs_update = True
+                
+                # Update release year if missing
+                if ('ReleaseYear' not in game or not game['ReleaseYear']) and hasattr(game_info, 'release_world'):
+                    game['ReleaseYear'] = game_info.release_world
+                    needs_update = True
+                
+                if needs_update:
+                    updated_count += 1
         
-        message = f"Updated {updated_count} fields" if updated_count > 0 else "No updates needed"
-        return jsonify({"message": message, "success": True})
+        save_games(games)
+        
+        message = []
+        if updated_count > 0:
+            message.append(f"Updated {updated_count} game{'s' if updated_count != 1 else ''}")
+        if cached_count > 0:
+            message.append(f"Cached {cached_count} image{'s' if cached_count != 1 else ''}")
+        
+        if not message:
+            message = ["No updates needed"]
+            
+        return jsonify({"success": True, "message": ". ".join(message)})
+        
     except Exception as e:
         logging.error(f"Error updating games: {e}")
-        return jsonify({"message": f"Error updating games: {str(e)}", "success": False})
+        return jsonify({"success": False, "message": "Error updating games"}), 500
 
 @app.route('/delete_game/<game_id>', methods=['DELETE'])
 def delete_game(game_id):
