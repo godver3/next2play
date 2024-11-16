@@ -3,12 +3,19 @@ import json
 import random
 import subprocess
 import logging
+import requests
+from bs4 import BeautifulSoup
+import time
 from howlongtobeatpy import HowLongToBeat
 import os
 import requests
 from urllib.parse import urlparse
 
 app = Flask(__name__)
+
+# Set up more detailed logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def load_games():
     with open('games_data.json', 'r') as f:
@@ -105,17 +112,64 @@ def add_game():
     submitted_hltb = float(data['HowLongToBeat']) if data['HowLongToBeat'] else 0
 
     try:
-        results = HowLongToBeat().search(search_term)
+        # Get user ID for API request
+        user_id = get_hltb_user_id()
+        if not user_id:
+            raise ValueError("Failed to get HLTB user ID")
+            
+        # Search for the game using our direct API call
+        url = "https://howlongtobeat.com/api/search"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Content-Type": "application/json",
+            "Origin": "https://howlongtobeat.com",
+            "Referer": "https://howlongtobeat.com/"
+        }
+        
+        payload = {
+            "searchType": "games",
+            "searchTerms": [search_term],
+            "searchPage": 1,
+            "size": 20,
+            "searchOptions": {
+                "games": {
+                    "userId": 0,
+                    "platform": "",
+                    "sortCategory": "popular",
+                    "rangeCategory": "main",
+                    "rangeTime": {"min": None, "max": None},
+                    "gameplay": {"perspective": "", "flow": "", "genre": ""},
+                    "rangeYear": {"min": "", "max": ""},
+                    "modifier": ""
+                },
+                "users": {
+                    "id": user_id,
+                    "sortCategory": "postcount"
+                },
+                "lists": {"sortCategory": "follows"},
+                "filter": "",
+                "sort": 0,
+                "randomizer": 0
+            },
+            "useCache": True
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        results = response.json().get('data', [])
         
         if results:
             # Find the specific game version that was selected
-            game_info = next((game for game in results if game.game_id == submitted_id), None)
+            game_info = next((game for game in results if game['game_id'] == submitted_id), None)
             
             if game_info:
-                game_id = game_info.game_id
-                game_name = game_info.game_name
-                image_url = game_info.game_image_url if hasattr(game_info, 'game_image_url') else ''
-                how_long_to_beat = "Unreleased" if submitted_hltb == 0 else round(submitted_hltb)
+                game_id = game_info['game_id']
+                game_name = game_info['game_name']
+                image_url = f"https://howlongtobeat.com/games/{game_info['game_image']}" if game_info.get('game_image') else ''
+                # Convert minutes to hours for the submitted time or use "Unreleased"
+                how_long_to_beat = "Unreleased" if submitted_hltb == 0 else round(submitted_hltb / 60)
                 release_year = submitted_year
 
                 games = load_games()
@@ -157,7 +211,7 @@ def add_game():
         else:
             return 'Game not found', 404
     except Exception as e:
-        logging.error(f"Unexpected error in add_game: {e}")
+        logging.error(f"Unexpected error in add_game: {str(e)}")
         return f'Unexpected error: {e}', 500
 
 @app.route('/update_games', methods=['POST'])
@@ -266,24 +320,96 @@ def in_progress_game():
 
 @app.route('/search_games', methods=['POST'])
 def search_games():
-    data = request.json
-    search_term = data['GameName']
-    
     try:
-        results = HowLongToBeat().search(search_term)
-        if results:
-            games_data = [{
-                'game_id': game.game_id,
-                'game_name': game.game_name,
-                'game_image_url': game.game_image_url if hasattr(game, 'game_image_url') else '',
-                'release_world': game.release_world if hasattr(game, 'release_world') else None,
-                'main_story': game.main_story
-            } for game in results]
+        data = request.json
+        search_term = data['GameName']
+        
+        logger.debug(f"Initializing direct search for term: {search_term}")
+        
+        # Get user ID
+        user_id = get_hltb_user_id()
+        if not user_id:
+            raise ValueError("Failed to get HLTB user ID")
+        
+        url = "https://howlongtobeat.com/api/search"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://howlongtobeat.com/",
+            "Content-Type": "application/json",
+            "Origin": "https://howlongtobeat.com",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "TE": "trailers"
+        }
+        
+        payload = {
+            "searchType": "games",
+            "searchTerms": [search_term],
+            "searchPage": 1,
+            "size": 20,
+            "searchOptions": {
+                "games": {
+                    "userId": 0,
+                    "platform": "",
+                    "sortCategory": "popular",
+                    "rangeCategory": "main",
+                    "rangeTime": {"min": None, "max": None},
+                    "gameplay": {"perspective": "", "flow": "", "genre": ""},
+                    "rangeYear": {"min": "", "max": ""},
+                    "modifier": ""
+                },
+                "users": {
+                    "id": user_id,
+                    "sortCategory": "postcount"
+                },
+                "lists": {"sortCategory": "follows"},
+                "filter": "",
+                "sort": 0,
+                "randomizer": 0
+            },
+            "useCache": True
+        }
+        
+        logger.debug("Sending request to HLTB API")
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        data = response.json()
+        logger.debug(f"Received response: {data}")
+        
+        if 'data' in data:
+            games_data = []
+            for game in data['data']:
+                # Convert minutes to hours and round to nearest hour
+                main_story_hours = round(game.get('comp_main', 0) / 60) if game.get('comp_main') else 0
+                
+                game_data = {
+                    'game_id': game.get('game_id'),
+                    'game_name': game.get('game_name', 'Unknown'),
+                    'game_image_url': f"https://howlongtobeat.com/games/{game.get('game_image', '')}" if game.get('game_image') else '',
+                    'release_world': game.get('release_world'),
+                    'main_story': main_story_hours
+                }
+                if game_data['game_id'] is not None:
+                    games_data.append(game_data)
+            
+            logger.debug(f"Processed {len(games_data)} games")
             return jsonify(games_data)
+            
+        logger.debug("No results found")
         return jsonify([])
+        
     except Exception as e:
-        logging.error(f"Error searching games: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error searching games: {str(e)}")
+        logger.exception("Full traceback:")
+        return jsonify({
+            'error': 'An error occurred while searching for games',
+            'details': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True, port=5015)

@@ -424,9 +424,9 @@ select {
                 const option = document.createElement('div');
                 option.className = 'game-option';
                 option.innerHTML = `
-                    <img src="${game.game_image_url || ''}" alt="${game.game_name}">
+                    <img src="${game.game_image_url || '/static/placeholder.jpg'}" alt="${game.game_name}">
                     <div class="game-option-info">
-                        <div class="game-option-title">${game.game_name}</div>
+                        <div class="game-option-title">${game.game_name || 'Unknown Title'}</div>
                         <div class="game-option-year">${game.release_world || 'Year unknown'}</div>
                     </div>
                 `;
@@ -443,8 +443,8 @@ select {
 
         function selectGame(gameInfo) {
             var formData = new FormData();
-            formData.append('GameName', gameInfo.game_name);
-            formData.append('GameID', gameInfo.game_id);
+            formData.append('GameName', gameInfo.game_name || '');
+            formData.append('GameID', gameInfo.game_id || '');
             formData.append('ReleaseYear', gameInfo.release_world || '');
             formData.append('HowLongToBeat', gameInfo.main_story || 0);
             formData.append('ImageURL', gameInfo.game_image_url || '');
@@ -460,12 +460,14 @@ select {
                 } else if (response.status === 409) {
                     showNotification('This version of the game already exists in your collection', 'duplicate');
                 } else {
-                    showNotification('Error adding game', 'error');
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'Error adding game');
+                    });
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showNotification('Error adding game', 'error');
+                showNotification(error.message || 'Error adding game', 'error');
             });
 
             closeGameSelection();
