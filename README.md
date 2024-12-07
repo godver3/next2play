@@ -1,18 +1,21 @@
 # next2play
 
-A Flask-based web application to manage your video game backlog. Keep track of games you want to play, their completion status, and how long they take to beat. Uses howlongtobeatpy to fetch game information from HLTB.com. Intented to be simple and no-frills.
+A Flask-based web application to manage your video game backlog. Keep track of games you want to play, their completion status, and how long they take to beat. Uses howlongtobeatpy to fetch game information from HLTB.com. Intended to be simple and no-frills.
 
-![image](https://github.com/user-attachments/assets/73f7ee29-1a54-417f-af6a-f4f72d8396c9)
+![image](https://github.com/user-attachments/assets/e4a2253f-bae8-4f22-bdb9-06eb67c0dd95)
+
 
 ## Features
 
 - Add games to your backlog
 - Automatically fetch game information from HowLongToBeat
-- Update game statuses (Not Started, In Progress, Completed)
+- Update game statuses (Not Started, In Progress, Completed, Tabled)
 - Get suggestions for random games to play
 - View currently in-progress games
+- Stats for your collection
+- Rudimentary password access
 
-![image](https://github.com/user-attachments/assets/ab8a9831-321e-49f9-9f24-649d67804273)
+![image](https://github.com/user-attachments/assets/96cf0717-70d1-4538-9c03-d3b773858e32)
 
 ## Setup
 
@@ -30,6 +33,8 @@ docker run -d \
   -p 5015:5015 \
   -v /path/to/games_data.json:/app/games_data.json \
   -v /path/to/game_images:/app/static/game_images \
+  -e ADMIN_PASSWORD=your-password-here \
+  -e SECRET_KEY=default-secret-key \
   godver3/next2play:latest
 ```
 
