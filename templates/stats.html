@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next2Play - Stats</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .stats-container {
+            max-width: 800px;
+            margin: 1rem auto;
+            padding: 1rem;
+            background: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            height: auto;
+        }
+        .stat-card {
+            background: #333;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stat-label {
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .stat-value {
+            font-size: 1.2rem;
+            color: #2196F3;
+        }
+        h1 {
+            margin: 0.5rem 0;
+            font-size: 1.75rem;
+        }
+        .back-btn {
+            margin: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .back-btn:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <button class="back-btn" onclick="window.location.href='/'">Back to Games</button>
+    
+    <div class="stats-container">
+        <h1>Gaming Statistics</h1>
+        
+        <div class="stat-card">
+            <span class="stat-label">Total Games:</span>
+            <span class="stat-value">{{ stats.total_games }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Completed Games:</span>
+            <span class="stat-value">{{ stats.completed_games }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Games In Progress:</span>
+            <span class="stat-value">{{ stats.in_progress_games }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Not Started Games:</span>
+            <span class="stat-value">{{ stats.not_started_games }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Tabled Games:</span>
+            <span class="stat-value">{{ stats.tabled_games }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Total Hours Completed:</span>
+            <span class="stat-value">{{ "%.0f"|format(stats.total_hours_completed) }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Total Hours Remaining (Not Started):</span>
+            <span class="stat-value">{{ "%.0f"|format(stats.total_hours_remaining) }}</span>
+        </div>
+        
+        <div class="stat-card">
+            <span class="stat-label">Total Hours In Progress:</span>
+            <span class="stat-value">{{ "%.0f"|format(stats.total_hours_in_progress) }}</span>
+        </div>
+    </div>
+</body>
+</html>

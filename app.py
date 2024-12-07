@@ -1,4 +1,5 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, session, redirect, url_for
+from functools import wraps
 import json
 import random
 import subprocess
@@ -8,14 +9,51 @@ from bs4 import BeautifulSoup
 import time
 from howlongtobeatpy import HowLongToBeat
 import os
-import requests
 from urllib.parse import urlparse
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')  # Change this in production
 
 # Set up more detailed logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Authentication decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated') and not session.get('view_only'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Edit protection decorator
+def edit_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            return jsonify({"error": "Authentication required"}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.form.get('password') == os.environ.get('ADMIN_PASSWORD', 'your-password-here'):
+            session['authenticated'] = True
+            return redirect(url_for('index'))
+        return render_template('login.html', error='Invalid password')
+    return render_template('login.html')
+
+@app.route('/view_only', methods=['POST'])
+def view_only():
+    session['view_only'] = True
+    return redirect(url_for('index'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 def load_games():
     with open('games_data.json', 'r') as f:
@@ -81,6 +119,7 @@ def download_and_cache_image(image_url, game_id):
     return f'/static/game_images/{local_filename}'
 
 @app.route('/')
+@login_required
 def index():
     sort_column = request.args.get('sort_column', 'GameName')
     sort_order = request.args.get('sort_order', 'ASC')
@@ -101,120 +140,109 @@ def index():
     if request.args.get('ajax'):
         return jsonify(games)
 
-    return render_template('index.html', games=games, sort_column=sort_column, sort_order=sort_order)
+    is_view_only = session.get('view_only', False)
+    return render_template('index.html', games=games, sort_column=sort_column, sort_order=sort_order, is_view_only=is_view_only)
 
 @app.route('/add_game', methods=['POST'])
+@edit_required
 def add_game():
-    data = request.form
-    search_term = data['GameName']
-    submitted_id = int(data['GameID'])
-    submitted_year = int(data['ReleaseYear']) if data['ReleaseYear'] else None
-    submitted_hltb = float(data['HowLongToBeat']) if data['HowLongToBeat'] else 0
-
     try:
-        # Get user ID for API request
-        user_id = get_hltb_user_id()
-        if not user_id:
-            raise ValueError("Failed to get HLTB user ID")
+        data = request.get_json()
+        logger.debug("Parsed JSON data: %s", data)
+        
+        if not data:
+            return jsonify({'success': False, 'message': 'No JSON data received'}), 400
             
-        # Search for the game using our direct API call
-        url = "https://howlongtobeat.com/api/search"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Content-Type": "application/json",
-            "Origin": "https://howlongtobeat.com",
-            "Referer": "https://howlongtobeat.com/"
-        }
+        search_term = data.get('GameName')
+        if not search_term:
+            return jsonify({'success': False, 'message': 'GameName is required'}), 400
+            
+        submitted_id = int(data['GameID'])
         
-        payload = {
-            "searchType": "games",
-            "searchTerms": [search_term],
-            "searchPage": 1,
-            "size": 20,
-            "searchOptions": {
-                "games": {
-                    "userId": 0,
-                    "platform": "",
-                    "sortCategory": "popular",
-                    "rangeCategory": "main",
-                    "rangeTime": {"min": None, "max": None},
-                    "gameplay": {"perspective": "", "flow": "", "genre": ""},
-                    "rangeYear": {"min": "", "max": ""},
-                    "modifier": ""
-                },
-                "users": {
-                    "id": user_id,
-                    "sortCategory": "postcount"
-                },
-                "lists": {"sortCategory": "follows"},
-                "filter": "",
-                "sort": 0,
-                "randomizer": 0
-            },
-            "useCache": True
-        }
-        
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        results = response.json().get('data', [])
+        # Search using the library
+        results = HowLongToBeat().search(search_term)
         
         if results:
             # Find the specific game version that was selected
-            game_info = next((game for game in results if game['game_id'] == submitted_id), None)
+            game_info = next((game for game in results if game.game_id == submitted_id), None)
             
             if game_info:
-                game_id = game_info['game_id']
-                game_name = game_info['game_name']
-                image_url = f"https://howlongtobeat.com/games/{game_info['game_image']}" if game_info.get('game_image') else ''
-                # Convert minutes to hours for the submitted time or use "Unreleased"
-                how_long_to_beat = "Unreleased" if submitted_hltb == 0 else round(submitted_hltb / 60)
-                release_year = submitted_year
+                game_id = game_info.game_id
+                game_name = game_info.game_name
+                
+                # Fix image URL handling
+                image_url = game_info.game_image_url
+                if image_url and not image_url.startswith('http'):
+                    image_url = f"https://howlongtobeat.com{image_url}"
+                
+                # Get completion time
+                how_long_to_beat = None
+                if hasattr(game_info, 'main_story') and game_info.main_story:
+                    how_long_to_beat = round(float(game_info.main_story))
+                
+                # Get release year
+                release_year = None
+                if hasattr(game_info, 'release_world') and game_info.release_world:
+                    release_year = int(game_info.release_world)
 
                 games = load_games()
 
-                # Check for duplicate based on exact match of name, year, and length
+                # Check for duplicate
                 existing_game = next(
                     (game for game in games 
                      if game['GameName'] == game_name 
-                     and game['ReleaseYear'] == release_year 
-                     and str(game['HowLongToBeat']) == str(how_long_to_beat)), 
+                     and game['ReleaseYear'] == release_year), 
                     None
                 )
 
                 if existing_game:
-                    return 'Duplicate game found', 409
-                else:
-                    # Cache the image locally
-                    cached_image_url = download_and_cache_image(image_url, game_id)
-                    logging.info(f"Original image URL: {image_url}")
-                    logging.info(f"Cached image URL: {cached_image_url}")
-                    
-                    new_game = {
-                        "GameID": game_id,
-                        "GameName": game_name,
-                        "HowLongToBeat": how_long_to_beat,
-                        "ProgressStatus": "Not Started",
-                        "ImageURL": cached_image_url,  # Make sure we're using the cached URL
-                        "ReleaseYear": release_year
-                    }
-                    
-                    # Before saving to JSON, log the game data
-                    logging.info(f"Saving game with data: {new_game}")
-                    
-                    games.append(new_game)
-                    save_games(games)
-                    return 'Game added successfully', 200
+                    return jsonify({
+                        'success': False,
+                        'message': 'This game is already in your collection'
+                    }), 409
+                
+                # Cache the image locally
+                cached_image_url = download_and_cache_image(image_url, game_id) if image_url else ''
+                logger.info("Original image URL: %s", image_url)
+                logger.info("Cached image URL: %s", cached_image_url)
+                
+                new_game = {
+                    "GameID": game_id,
+                    "GameName": game_name,
+                    "HowLongToBeat": how_long_to_beat or "Unreleased",
+                    "ProgressStatus": "Not Started",
+                    "ImageURL": cached_image_url or '',
+                    "ReleaseYear": release_year
+                }
+                
+                logger.info("Saving game with data: %s", new_game)
+                
+                games.append(new_game)
+                save_games(games)
+                return jsonify({
+                    'success': True,
+                    'message': 'Game added successfully',
+                    'game': new_game
+                }), 200
             else:
-                return 'Selected game version not found', 404
+                return jsonify({
+                    'success': False,
+                    'message': 'Selected game version not found'
+                }), 404
         else:
-            return 'Game not found', 404
+            return jsonify({
+                'success': False,
+                'message': 'Game not found'
+            }), 404
     except Exception as e:
-        logging.error(f"Unexpected error in add_game: {str(e)}")
-        return f'Unexpected error: {e}', 500
+        logger.error("Unexpected error in add_game: %s", str(e))
+        return jsonify({
+            'success': False,
+            'message': f'Error adding game: {str(e)}'
+        }), 500
 
 @app.route('/update_games', methods=['POST'])
+@edit_required
 def update_games():
     try:
         games = load_games()
@@ -267,6 +295,7 @@ def update_games():
         return jsonify({"success": False, "message": "Error updating games"}), 500
 
 @app.route('/delete_game/<game_id>', methods=['DELETE'])
+@edit_required
 def delete_game(game_id):
     games = load_games()
     initial_count = len(games)
@@ -286,18 +315,32 @@ def delete_game(game_id):
         return jsonify({"message": "Game not found", "success": False}), 404
 
 @app.route('/update_status/<int:game_id>', methods=['POST'])
+@edit_required
 def update_status(game_id):
-    data = request.json
-    new_status = data.get('status')
+    try:
+        data = request.json
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({"success": False, "message": "Status is required"}), 400
 
-    games = load_games()
-    for game in games:
-        if game['GameID'] == game_id:
-            game['ProgressStatus'] = new_status
-            break
-    save_games(games)
+        games = load_games()
+        game_found = False
+        for game in games:
+            if game['GameID'] == game_id:
+                game['ProgressStatus'] = new_status
+                game_found = True
+                break
+                
+        if not game_found:
+            return jsonify({"success": False, "message": "Game not found"}), 404
+            
+        save_games(games)
+        return jsonify({"success": True, "message": "Status updated successfully"})
 
-    return jsonify({"message": "Status updated successfully"}), 200
+    except Exception as e:
+        logger.error(f"Error updating status: {str(e)}")
+        return jsonify({"success": False, "message": "Error updating status"}), 500
 
 
 @app.route('/random_game')
@@ -324,82 +367,36 @@ def search_games():
         data = request.json
         search_term = data['GameName']
         
-        logger.debug(f"Initializing direct search for term: {search_term}")
+        logger.debug(f"Searching for term: {search_term}")
         
-        # Get user ID
-        user_id = get_hltb_user_id()
-        if not user_id:
-            raise ValueError("Failed to get HLTB user ID")
+        # Use the HowLongToBeat library to search
+        results = HowLongToBeat().search(search_term)
         
-        url = "https://howlongtobeat.com/api/search"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Referer": "https://howlongtobeat.com/",
-            "Content-Type": "application/json",
-            "Origin": "https://howlongtobeat.com",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin",
-            "TE": "trailers"
-        }
-        
-        payload = {
-            "searchType": "games",
-            "searchTerms": [search_term],
-            "searchPage": 1,
-            "size": 20,
-            "searchOptions": {
-                "games": {
-                    "userId": 0,
-                    "platform": "",
-                    "sortCategory": "popular",
-                    "rangeCategory": "main",
-                    "rangeTime": {"min": None, "max": None},
-                    "gameplay": {"perspective": "", "flow": "", "genre": ""},
-                    "rangeYear": {"min": "", "max": ""},
-                    "modifier": ""
-                },
-                "users": {
-                    "id": user_id,
-                    "sortCategory": "postcount"
-                },
-                "lists": {"sortCategory": "follows"},
-                "filter": "",
-                "sort": 0,
-                "randomizer": 0
-            },
-            "useCache": True
-        }
-        
-        logger.debug("Sending request to HLTB API")
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        
-        data = response.json()
-        logger.debug(f"Received response: {data}")
-        
-        if 'data' in data:
+        if results:
             games_data = []
-            for game in data['data']:
-                # Convert minutes to hours and round to nearest hour
-                main_story_hours = round(game.get('comp_main', 0) / 60) if game.get('comp_main') else 0
+            for game in results:
+                # Fix image URL construction
+                image_url = game.game_image_url
+                if image_url and not image_url.startswith('http'):
+                    image_url = f"https://howlongtobeat.com{image_url}"
+                
+                # Get main story time in hours
+                main_story_hours = game.main_story if hasattr(game, 'main_story') else None
+                if main_story_hours:
+                    main_story_hours = round(float(main_story_hours))
                 
                 game_data = {
-                    'game_id': game.get('game_id'),
-                    'game_name': game.get('game_name', 'Unknown'),
-                    'game_image_url': f"https://howlongtobeat.com/games/{game.get('game_image', '')}" if game.get('game_image') else '',
-                    'release_world': game.get('release_world'),
+                    'game_id': game.game_id,
+                    'game_name': game.game_name,
+                    'game_image_url': image_url,
+                    'release_world': game.release_world if hasattr(game, 'release_world') else None,
                     'main_story': main_story_hours
                 }
-                if game_data['game_id'] is not None:
-                    games_data.append(game_data)
+                games_data.append(game_data)
             
-            logger.debug(f"Processed {len(games_data)} games")
+            logger.debug(f"Found {len(games_data)} games")
             return jsonify(games_data)
-            
+        
         logger.debug("No results found")
         return jsonify([])
         
@@ -410,6 +407,36 @@ def search_games():
             'error': 'An error occurred while searching for games',
             'details': str(e)
         }), 500
+
+def get_hltb_user_id():
+    # Placeholder implementation
+    # Replace with actual logic to retrieve the user ID if needed
+    return 1
+
+@app.route('/stats')
+@login_required
+def stats():
+    games = load_games()
+    
+    # Calculate statistics
+    stats = {
+        'total_games': len(games),
+        'completed_games': len([g for g in games if g['ProgressStatus'] == 'Complete']),
+        'in_progress_games': len([g for g in games if g['ProgressStatus'] == 'In Progress']),
+        'not_started_games': len([g for g in games if g['ProgressStatus'] == 'Not Started']),
+        'tabled_games': len([g for g in games if g['ProgressStatus'] == 'Tabled']),
+        'total_hours_completed': sum(float(g['HowLongToBeat']) for g in games 
+                                   if g['ProgressStatus'] == 'Complete' 
+                                   and g['HowLongToBeat'] != 'Unreleased'),
+        'total_hours_remaining': sum(float(g['HowLongToBeat']) for g in games 
+                                   if g['ProgressStatus'] == 'Not Started' 
+                                   and g['HowLongToBeat'] != 'Unreleased'),
+        'total_hours_in_progress': sum(float(g['HowLongToBeat']) for g in games 
+                                     if g['ProgressStatus'] == 'In Progress' 
+                                     and g['HowLongToBeat'] != 'Unreleased')
+    }
+    
+    return render_template('stats.html', stats=stats)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True, port=5015)

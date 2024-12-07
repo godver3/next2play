@@ -1,0 +1,343 @@
+/* Base Styles */
+body {
+    font-family: 'Arial', sans-serif;
+    background: #121212;
+    color: #ffffff;
+    margin: 0;
+    padding: 20px;
+}
+
+/* Header Styles */
+.header-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    position: relative;
+    padding-top: 20px;
+}
+
+.main-header {
+    text-align: center;
+    position: relative;
+    width: 100%;
+    max-width: 1200px;
+}
+
+.main-header h1 {
+    margin: 0 0 20px 0;
+    font-size: 2.5em;
+    color: #ffffff;
+}
+
+/* Form Styles */
+#game-form {
+    margin-bottom: 20px;
+}
+
+#game-form input[type="text"] {
+    padding: 8px;
+    margin-right: 10px;
+    border: 1px solid #444;
+    background: #333;
+    color: white;
+    border-radius: 4px;
+}
+
+button {
+    padding: 8px 16px;
+    margin: 0 5px;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+/* Button-specific styles */
+button[onclick="submitGameForm()"] {
+    background: #4CAF50;  /* Green */
+}
+
+button[onclick="submitGameForm()"]:hover {
+    background: #45a049;
+}
+
+button[onclick="getRandomGame()"] {
+    background: #2196F3;  /* Blue */
+}
+
+button[onclick="getRandomGame()"]:hover {
+    background: #1976D2;
+}
+
+button[onclick="updateGames()"] {
+    background: #9C27B0;  /* Purple */
+}
+
+button[onclick="updateGames()"]:hover {
+    background: #7B1FA2;
+}
+
+/* Logout Button Styles */
+button[onclick="window.location.href='/logout'"] {
+    background: #ff4444;
+}
+
+button[onclick="window.location.href='/logout'"]:hover {
+    background: #ff6666;
+}
+
+/* Keep the default style for other buttons */
+button:not([onclick="submitGameForm()"]):not([onclick="getRandomGame()"]):not([onclick="updateGames()"]):not([onclick="window.location.href='/logout'"]) {
+    background: #444;
+}
+
+button:not([onclick="submitGameForm()"]):not([onclick="getRandomGame()"]):not([onclick="updateGames()"]):not([onclick="window.location.href='/logout'"]):hover {
+    background: #555;
+}
+
+/* Game Grid Styles */
+#game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.game-card {
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.3s;
+}
+
+.game-card:hover {
+    transform: translateY(-5px);
+}
+
+.game-poster {
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+}
+
+.game-info {
+    padding: 15px;
+}
+
+.game-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 2.4em;  /* Adjust this value based on your line-height if needed */
+    line-height: 1.2;
+}
+
+.game-hltb {
+    font-size: 0.9em;
+    color: #aaa;
+    margin-bottom: 8px;
+}
+
+.release-year {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+/* Status Styles */
+.status-not-started {
+    border: 2px solid #666;
+    background: rgba(102, 102, 102, 0.2);
+}
+
+.status-in-progress {
+    border: 2px solid #ffd700;
+    background: rgba(255, 215, 0, 0.5);
+}
+
+.status-complete {
+    border: 2px solid #4CAF50;
+    background: rgba(76, 175, 80, 0.5);
+}
+
+.status-tabled {
+    border: 2px solid #ff4444;
+    background: rgba(255, 68, 68, 0.5);
+}
+
+/* Game Selection Popup Styles */
+.popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.popup-content {
+    background: #1e1e1e;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.game-option {
+    display: flex;
+    padding: 10px;
+    margin: 10px 0;
+    background: #333;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.game-option:hover {
+    background: #444;
+}
+
+.game-option-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 15px;
+}
+
+.game-option-info {
+    flex-grow: 1;
+}
+
+.game-option-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.game-option-details {
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.game-option-details span {
+    display: block;
+    margin: 2px 0;
+}
+
+/* Notification Styles */
+#notificationBar {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 4px;
+    color: white;
+    font-weight: 500;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        top: -100px;
+        opacity: 0;
+    }
+    to {
+        top: 20px;
+        opacity: 1;
+    }
+}
+
+/* Notification Types */
+#notificationBar.success {
+    background-color: #4CAF50;
+}
+
+#notificationBar.error {
+    background-color: #f44336;
+}
+
+#notificationBar.warning {
+    background-color: #ff9800;
+}
+
+/* Highlight Animation */
+@keyframes highlight {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.highlighted {
+    animation: highlight 0.5s ease-in-out;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+/* Logout Button Styles */
+.logout-container {
+    /* position: absolute; */
+    /* top: 10px; */
+    /* right: 10px; */
+}
+
+.logout-btn {
+    background: #ff4444;
+}
+
+.logout-btn:hover {
+    background: #ff6666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #game-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        padding: 10px;
+    }
+
+    .game-poster {
+        height: 225px;
+    }
+
+    .game-info {
+        padding: 10px;
+    }
+
+    button {
+        margin: 5px;
+    }
+
+    #game-form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+
+    #game-form input[type="text"] {
+        width: 80%;
+        margin: 0;
+    }
+}
