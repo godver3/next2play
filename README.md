@@ -14,6 +14,7 @@ A Flask-based web application to manage your video game backlog. Keep track of g
 - View currently in-progress games
 - Stats for your collection
 - Rudimentary password access
+- Posters cached locally
 
 ![image](https://github.com/user-attachments/assets/96cf0717-70d1-4538-9c03-d3b773858e32)
 
