@@ -20,11 +20,15 @@ function setupEventListeners() {
 
 // Game Management Functions
 async function submitGameForm() {
-    const gameName = document.getElementById('GameName').value.trim();
+    // Get value from either desktop or mobile input
+    const desktopInput = document.getElementById('GameName');
+    const mobileInput = document.getElementById('GameNameMobile');
+    const gameName = (desktopInput?.value || mobileInput?.value).trim();
+    
     if (!gameName) return;
 
     const payload = { GameName: gameName };
-    console.log('Sending payload:', payload); // Debug log
+    console.log('Sending payload:', payload);
 
     try {
         const response = await fetch('/search_games', {
@@ -44,6 +48,10 @@ async function submitGameForm() {
 
         const games = await response.json();
         if (games && games.length > 0) {
+            // Clear both input fields
+            if (desktopInput) desktopInput.value = '';
+            if (mobileInput) mobileInput.value = '';
+            
             showGameSelection(games.map(game => ({
                 id: game.game_id,
                 name: game.game_name,
@@ -138,6 +146,14 @@ async function getRandomGame() {
     
     showNotification(`Random game selected: ${selectedGame.GameName}`, 'success');
     highlightGame(selectedGame.GameID);
+
+    // Close mobile menu if open
+    const mobileMenu = document.querySelector('.mobile-menu');
+    const overlay = document.querySelector('.menu-overlay');
+    if (mobileMenu.classList.contains('active')) {
+        mobileMenu.classList.remove('active');
+        overlay.classList.remove('active');
+    }
 }
 
 async function updateGames() {
@@ -348,3 +364,9 @@ function sortGames() {
     });
 }
 
+function toggleMobileMenu() {
+    const mobileMenu = document.querySelector('.mobile-menu');
+    const overlay = document.querySelector('.menu-overlay');
+    mobileMenu.classList.toggle('active');
+    overlay.classList.toggle('active');
+}

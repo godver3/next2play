@@ -11,7 +11,8 @@
 
     <div class="header-container">
         <div class="main-header">
-            <h1>Next2Play</h1>
+            <h1 class="desktop-title">Next2Play</h1>
+            
             {% if not is_view_only %}
             <div id="game-form">
                 <input type="text" id="GameName" name="GameName" placeholder="Enter game name" required>
@@ -25,6 +26,26 @@
                 <button onclick="window.location.href='/logout'" class="logout-btn">Logout</button>
             </div>
         </div>
+    </div>
+
+    <div class="mobile-header">
+        <button class="menu-toggle" onclick="toggleMobileMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1>Next2Play</h1>
+    </div>
+
+    <div class="mobile-menu">
+        {% if not is_view_only %}
+        <input type="text" id="GameNameMobile" name="GameName" placeholder="Enter game name" required>
+        <button onclick="submitGameForm()">Add Game</button>
+        <button onclick="getRandomGame()">Random Game</button>
+        <button onclick="updateGames()">Update Games</button>
+        <button onclick="window.location.href='/stats'" class="stats-btn">View Stats</button>
+        {% endif %}
+        <button onclick="window.location.href='/logout'" class="logout-btn">Logout</button>
     </div>
 
     <div id="game-grid">
@@ -60,6 +81,8 @@
             <button onclick="closeGameSelection()">Cancel</button>
         </div>
     </div>
+
+    <div class="menu-overlay" onclick="toggleMobileMenu()"></div>
 
     <script>
         let games = [

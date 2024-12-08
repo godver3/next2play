@@ -199,6 +199,7 @@ button:not([onclick="submitGameForm()"]):not([onclick="getRandomGame()"]):not([o
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    position: relative;
 }
 
 .game-option {
@@ -339,5 +340,170 @@ button:not([onclick="submitGameForm()"]):not([onclick="getRandomGame()"]):not([o
     #game-form input[type="text"] {
         width: 80%;
         margin: 0;
+    }
+}
+
+/* Mobile Header Styles */
+.mobile-header {
+    display: none;
+    align-items: center;
+    padding: 15px;
+    background: #1e1e1e;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+}
+
+.mobile-header h1 {
+    margin: 0;
+    font-size: 1.8em;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    text-align: center;
+}
+
+/* Hamburger Menu Styles */
+.menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 30px;
+    height: 21px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    z-index: 1000;
+}
+
+.menu-toggle span {
+    width: 100%;
+    height: 3px;
+    background-color: white;
+    border-radius: 3px;
+}
+
+/* Mobile Menu Container */
+.mobile-menu {
+    visibility: hidden;
+    position: fixed;
+    top: 0;
+    left: -250px;
+    width: 250px;
+    height: 100vh;
+    background: #1e1e1e;
+    padding: 80px 20px 20px;
+    transition: left 0.3s ease, visibility 0.3s ease;
+    z-index: 998;
+}
+
+.mobile-menu.active {
+    visibility: visible;
+    left: 0;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding-top: 60px;
+    }
+
+    .mobile-header {
+        display: flex;
+    }
+
+    .menu-toggle {
+        display: flex;
+    }
+
+    .mobile-menu {
+        visibility: hidden;
+    }
+
+    .main-header h1 {
+        display: none;
+    }
+
+    #game-form {
+        display: none;
+    }
+
+    .logout-container {
+        display: none;
+    }
+
+    .mobile-menu button {
+        width: 100%;
+        margin: 10px 0;
+        padding: 12px;
+    }
+
+    .mobile-menu input[type="text"] {
+        width: 100%;
+        margin: 10px 0;
+        padding: 12px;
+        box-sizing: border-box;
+    }
+}
+
+/* Menu Overlay */
+.menu-overlay {
+    visibility: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 997;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.menu-overlay.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Desktop title */
+.desktop-title {
+    display: block;
+    margin: 0 0 20px 0;
+    font-size: 2.5em;
+    color: #ffffff;
+}
+
+@media (max-width: 768px) {
+    .desktop-title {
+        display: none;
+    }
+
+    .mobile-header {
+        display: flex;
+    }
+
+    /* ... rest of your mobile styles ... */
+}
+
+@media (max-width: 768px) {
+    .popup-content {
+        max-height: 70vh;
+        margin: 15vh auto;
+        padding-bottom: 70px; /* Space for the cancel button */
+    }
+
+    .popup-content button[onclick="closeGameSelection()"] {
+        position: fixed;
+        bottom: 20vh;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        padding: 15px;
+        background: #ff4444;
+        z-index: 1001;
     }
 }
