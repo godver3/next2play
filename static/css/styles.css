@@ -507,3 +507,73 @@ button:not([onclick="submitGameForm()"]):not([onclick="getRandomGame()"]):not([o
         z-index: 1001;
     }
 }
+
+/* Options Button Style */
+.options-btn {
+    background: #FF9800 !important;  /* Orange */
+}
+
+.options-btn:hover {
+    background: #F57C00 !important;
+}
+
+/* Options Popup Styles */
+.options-popup {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.options-content {
+    background: #1e1e1e;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 400px;
+    width: 90%;
+}
+
+.options-content h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.option-item {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.option-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.option-item label {
+    cursor: pointer;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .options-content {
+        width: 80%;
+        margin: 20vh auto;
+        max-width: none; /* Remove max-width constraint on mobile */
+    }
+}
+
+/* Stats Button Style */
+.stats-btn {
+    background: #00BCD4 !important;  /* Teal/Cyan */
+}
+
+.stats-btn:hover {
+    background: #0097A7 !important;  /* Darker Teal */
+}

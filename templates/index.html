@@ -19,6 +19,7 @@
                 <button onclick="submitGameForm()">Add Game</button>
                 <button onclick="getRandomGame()">Random Game</button>
                 <button onclick="updateGames()">Update Games</button>
+                <button onclick="toggleOptionsMenu()" class="options-btn">Options</button>
                 <button onclick="window.location.href='/stats'" class="stats-btn">View Stats</button>
             </div>
             {% endif %}
@@ -43,6 +44,7 @@
         <button onclick="submitGameForm()">Add Game</button>
         <button onclick="getRandomGame()">Random Game</button>
         <button onclick="updateGames()">Update Games</button>
+        <button onclick="toggleOptionsMenu()" class="options-btn">Options</button>
         <button onclick="window.location.href='/stats'" class="stats-btn">View Stats</button>
         {% endif %}
         <button onclick="window.location.href='/logout'" class="logout-btn">Logout</button>
@@ -83,6 +85,21 @@
     </div>
 
     <div class="menu-overlay" onclick="toggleMobileMenu()"></div>
+
+    <div class="options-popup">
+        <div class="options-content">
+            <h3>Display Options</h3>
+            <div class="option-item">
+                <input type="checkbox" id="hideCompleted" onchange="updateDisplayOptions()">
+                <label for="hideCompleted">Hide Completed Games</label>
+            </div>
+            <div class="option-item">
+                <input type="checkbox" id="hideTabled" onchange="updateDisplayOptions()">
+                <label for="hideTabled">Hide Tabled Games</label>
+            </div>
+            <button onclick="toggleOptionsMenu()">Close</button>
+        </div>
+    </div>
 
     <script>
         let games = [

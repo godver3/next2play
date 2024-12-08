@@ -3,7 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     sortGames();
     renderGames();
     loadFilters();
-    
+    loadDisplayOptions();
+
     if (!IS_VIEW_ONLY) {
         setupEventListeners();
     }
@@ -321,10 +322,21 @@ function renderGames() {
     });
 }
 
+// Update the filterGames function to use the display options
 function filterGames() {
     let filteredGames = [...games];
     const statusFilter = document.getElementById('statusFilter')?.value;
     const searchFilter = document.getElementById('searchFilter')?.value?.toLowerCase();
+    const hideCompleted = getCookie('hideCompleted') === 'true';
+    const hideTabled = getCookie('hideTabled') === 'true';
+
+    if (hideCompleted) {
+        filteredGames = filteredGames.filter(game => game.ProgressStatus !== 'Complete');
+    }
+
+    if (hideTabled) {
+        filteredGames = filteredGames.filter(game => game.ProgressStatus !== 'Tabled');
+    }
 
     if (statusFilter && statusFilter !== 'All') {
         filteredGames = filteredGames.filter(game => game.ProgressStatus === statusFilter);
@@ -369,4 +381,59 @@ function toggleMobileMenu() {
     const overlay = document.querySelector('.menu-overlay');
     mobileMenu.classList.toggle('active');
     overlay.classList.toggle('active');
+}
+
+// Add these functions
+function toggleOptionsMenu() {
+    const optionsPopup = document.querySelector('.options-popup');
+    if (optionsPopup.style.display === 'flex') {
+        optionsPopup.style.display = 'none';
+    } else {
+        optionsPopup.style.display = 'flex';
+        loadDisplayOptions();
+    }
+
+    // Close mobile menu if open
+    const mobileMenu = document.querySelector('.mobile-menu');
+    const overlay = document.querySelector('.menu-overlay');
+    if (mobileMenu.classList.contains('active')) {
+        mobileMenu.classList.remove('active');
+        overlay.classList.remove('active');
+    }
+}
+
+function loadDisplayOptions() {
+    const hideCompleted = getCookie('hideCompleted') === 'true';
+    const hideTabled = getCookie('hideTabled') === 'true';
+    
+    document.getElementById('hideCompleted').checked = hideCompleted;
+    document.getElementById('hideTabled').checked = hideTabled;
+}
+
+function updateDisplayOptions() {
+    const hideCompleted = document.getElementById('hideCompleted').checked;
+    const hideTabled = document.getElementById('hideTabled').checked;
+    
+    setCookie('hideCompleted', hideCompleted, 365);
+    setCookie('hideTabled', hideTabled, 365);
+    
+    renderGames(); // Refresh the game display
+}
+
+// Cookie utilities
+function setCookie(name, value, days) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+}
+
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
 }
