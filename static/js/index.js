@@ -1,12 +1,26 @@
 // Global variables and event listeners
 document.addEventListener('DOMContentLoaded', () => {
     sortGames();
-    renderGames();
+    renderGames(true);
     loadFilters();
     loadDisplayOptions();
 
     if (!IS_VIEW_ONLY) {
         setupEventListeners();
+    }
+
+    // Setup infinite scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                renderGames(false);
+            }
+        });
+    });
+
+    const sentinel = document.getElementById('sentinel');
+    if (sentinel) {
+        observer.observe(sentinel);
     }
 });
 
@@ -302,20 +316,36 @@ async function selectGame(game) {
 }
 
 // Game Rendering and Filtering Functions
-function renderGames() {
+let currentIndex = 0;
+const BATCH_SIZE = 20;
+
+function renderGames(reset = false) {
     const gameGrid = document.getElementById('game-grid');
-    gameGrid.innerHTML = '';
+    if (reset) {
+        gameGrid.innerHTML = '<div id="sentinel"></div>';
+        currentIndex = 0;
+    }
 
     const filteredGames = filterGames();
+    const endIndex = Math.min(currentIndex + BATCH_SIZE, filteredGames.length);
+    const gamesToRender = filteredGames.slice(currentIndex, endIndex);
     
-    filteredGames.forEach(game => {
+    const fragment = document.createDocumentFragment();
+    
+    gamesToRender.forEach(game => {
         const gameCard = document.createElement('div');
         gameCard.className = `game-card status-${game.ProgressStatus.toLowerCase().replace(' ', '-')}`;
         gameCard.dataset.gameId = game.GameID;
 
         gameCard.innerHTML = `
             ${game.ReleaseYear ? `<div class="release-year">${game.ReleaseYear}</div>` : ''}
-            <img src="${game.ImageURL}" alt="${game.GameName}" class="game-poster">
+            <img src="${game.ImageURL}" 
+                 alt="${game.GameName}" 
+                 class="game-poster"
+                 loading="lazy"
+                 decoding="async"
+                 width="150"
+                 height="225">
             <div class="game-info">
                 <div class="game-title">${game.GameName}</div>
                 <div class="game-hltb">How Long to Beat: ${game.HowLongToBeat}</div>
@@ -331,8 +361,18 @@ function renderGames() {
             </div>
         `;
 
-        gameGrid.appendChild(gameCard);
+        fragment.appendChild(gameCard);
     });
+
+    // Insert before the sentinel
+    const sentinel = document.getElementById('sentinel');
+    gameGrid.insertBefore(fragment, sentinel);
+    currentIndex = endIndex;
+
+    // If we've rendered all games, remove the sentinel
+    if (currentIndex >= filteredGames.length) {
+        sentinel?.remove();
+    }
 }
 
 // Update the filterGames function to use the display options
@@ -369,11 +409,11 @@ function loadFilters() {
     const searchFilter = document.getElementById('searchFilter');
 
     if (statusFilter) {
-        statusFilter.addEventListener('change', renderGames);
+        statusFilter.addEventListener('change', () => renderGames(true));
     }
     
     if (searchFilter) {
-        searchFilter.addEventListener('input', renderGames);
+        searchFilter.addEventListener('input', () => renderGames(true));
     }
 }
 

@@ -51,12 +51,13 @@
     </div>
 
     <div id="game-grid">
-        {% for game in games %}
+        <div id="sentinel"></div>
+        {% for game in games[:20] %}
         <div class="game-card status-{{ game['ProgressStatus'].replace(' ', '-').lower() }}" data-game-id="{{ game['GameID'] }}">
             {% if game['ReleaseYear'] %}
             <div class="release-year">{{ game['ReleaseYear'] }}</div>
             {% endif %}
-            <img src="{{ game['ImageURL'] }}" alt="{{ game['GameName'] }}" class="game-poster">
+            <img src="{{ game['ImageURL'] }}" alt="{{ game['GameName'] }}" class="game-poster" loading="lazy" decoding="async" width="150" height="225">
             <div class="game-info">
                 <div class="game-title">{{ game['GameName'] }}</div>
                 <div class="game-hltb">How Long to Beat: {{ game['HowLongToBeat'] }}{% if game['HowLongToBeat'] != "Unreleased" %} hours{% endif %}</div>
