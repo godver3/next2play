@@ -235,10 +235,16 @@ function showGameSelection(gameOptions) {
                 <div class="game-option-details">
                     ${game.platform ? `<span>Platform: ${game.platform}</span>` : ''}
                     ${game.release_date ? `<span>Release: ${game.release_date}</span>` : ''}
+                    ${game.hltb ? `<span>Time to Beat: ${game.hltb} hours</span>` : ''}
                 </div>
             </div>
         `;
-        option.onclick = () => selectGame(game.id);
+        option.onclick = () => selectGame({
+            id: game.id,
+            name: game.name,
+            release_date: game.release_date,
+            hltb: game.hltb
+        });
         optionsContainer.appendChild(option);
     });
 
@@ -249,7 +255,7 @@ function closeGameSelection() {
     document.getElementById('gameSelectionPopup').style.display = 'none';
 }
 
-async function selectGame(gameId) {
+async function selectGame(game) {
     try {
         const response = await fetch('/add_game', {
             method: 'POST',
@@ -257,10 +263,10 @@ async function selectGame(gameId) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                GameID: gameId,
-                GameName: document.getElementById('GameName').value.trim(),
-                ReleaseYear: null,
-                HowLongToBeat: null
+                GameID: game.id,
+                GameName: game.name,
+                ReleaseYear: game.release_date,
+                HowLongToBeat: game.hltb
             })
         });
 
@@ -273,13 +279,20 @@ async function selectGame(gameId) {
 
         if (!response.ok) throw new Error('Network response was not ok');
 
-        // Show notification and wait briefly before refreshing
-        showNotification('Game added successfully!', 'success');
-        document.getElementById('GameName').value = '';
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000); // Wait 1 second before refreshing
-
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Game added successfully!', 'success');
+            // Clear input fields
+            document.getElementById('GameName').value = '';
+            document.getElementById('GameNameMobile').value = '';
+            
+            // Refresh the page after a brief delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showNotification('Failed to add game', 'error');
+        }
     } catch (error) {
         showNotification('Error adding game', 'error');
         console.error('Error:', error);
