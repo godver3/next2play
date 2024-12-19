@@ -7,3 +7,6 @@ games_data.json
 update.sh
 static/game_images/*
 !static/game_images/.gitkeep
+*pycache*
+optimize_images.py
+refetch_images.py
