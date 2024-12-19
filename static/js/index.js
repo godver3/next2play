@@ -4,6 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderGames(true);
     loadFilters();
     loadDisplayOptions();
+    
+    // Initialize recent games panel elements
+    recentGamesPanel = document.getElementById('recentGamesPanel');
+    recentGamesList = document.getElementById('recentGamesList');
+    
+    // Load recent games on startup
+    loadRecentGames();
 
     if (!IS_VIEW_ONLY) {
         setupEventListeners();
@@ -22,6 +29,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sentinel) {
         observer.observe(sentinel);
     }
+});
+
+// Add at the start of the file
+const imageObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const img = entry.target;
+            if (img.dataset.src) {
+                img.src = img.dataset.src;
+                img.removeAttribute('data-src');
+                observer.unobserve(img);
+            }
+        }
+    });
+}, {
+    rootMargin: '50px 0px', // Start loading images when they're within 50px of viewport
+    threshold: 0.1
 });
 
 function setupEventListeners() {
@@ -74,6 +98,9 @@ async function submitGameForm() {
                 release_date: game.release_world,
                 hltb: game.main_story
             })));
+            
+            // Refresh recent games list
+            loadRecentGames();
         } else {
             showNotification('No games found', 'error');
         }
@@ -220,17 +247,112 @@ function updateGameCardStatus(gameId, newStatus) {
 }
 
 function highlightGame(gameId) {
-    // Remove highlight from all games
-    document.querySelectorAll('.game-card').forEach(card => {
-        card.classList.remove('highlighted');
-    });
+    // Find the index of the game in the full games array
+    const gameIndex = games.findIndex(g => g.GameID === gameId);
+    if (gameIndex === -1) return;
 
-    // Add highlight to selected game
-    const gameCard = document.querySelector(`[data-game-id="${gameId}"]`);
-    if (gameCard) {
-        gameCard.classList.add('highlighted');
-        gameCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Calculate how many batches we need to load to show this game
+    const requiredBatches = Math.floor(gameIndex / BATCH_SIZE) + 1;
+    
+    // Reset the current index and render enough games
+    currentIndex = 0;
+    renderGames(true, () => {
+        // After initial render, load remaining batches if needed
+        const loadRemaining = async () => {
+            while (currentIndex < requiredBatches * BATCH_SIZE) {
+                await new Promise(resolve => setTimeout(resolve, 10)); // Small delay to prevent UI freeze
+                renderGames(false);
+            }
+            
+            // Once loaded, scroll to the game and prioritize its image
+            const gameCard = document.querySelector(`[data-game-id="${gameId}"]`);
+            if (gameCard) {
+                gameCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                gameCard.classList.add('highlighted');
+                
+                // Immediately load the image for the highlighted game
+                const img = gameCard.querySelector('img');
+                if (img && img.dataset.src) {
+                    img.src = img.dataset.src;
+                    img.removeAttribute('data-src');
+                }
+                
+                setTimeout(() => gameCard.classList.remove('highlighted'), 2000);
+            }
+        };
+        loadRemaining();
+    });
+}
+
+function renderGames(reset = false, callback = null) {
+    if (reset) {
+        const gameGrid = document.getElementById('game-grid');
+        if (!gameGrid) return;
+        
+        // Keep only the sentinel
+        const sentinel = document.getElementById('sentinel');
+        gameGrid.innerHTML = '';
+        if (sentinel) gameGrid.appendChild(sentinel);
+        
+        currentIndex = 0;
     }
+
+    const filteredGames = filterGames();
+    const fragment = document.createDocumentFragment();
+    
+    const endIndex = Math.min(currentIndex + BATCH_SIZE, filteredGames.length);
+    
+    for (let i = currentIndex; i < endIndex; i++) {
+        const game = filteredGames[i];
+        const gameCard = document.createElement('div');
+        gameCard.className = `game-card status-${game.ProgressStatus.toLowerCase().replace(' ', '-')}`;
+        gameCard.dataset.gameId = game.GameID;
+
+        // Use data-src for lazy loading
+        gameCard.innerHTML = `
+            ${game.ReleaseYear ? `<div class="release-year">${game.ReleaseYear}</div>` : ''}
+            <img data-src="${game.ImageURL}" 
+                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 225'%3E%3C/svg%3E"
+                 alt="${game.GameName}" 
+                 class="game-poster"
+                 loading="lazy"
+                 decoding="async"
+                 width="150"
+                 height="225">
+            <div class="game-info">
+                <div class="game-title">${game.GameName}</div>
+                <div class="game-hltb">How Long to Beat: ${game.HowLongToBeat}</div>
+                ${!IS_VIEW_ONLY ? `
+                    <select onchange="updateProgressStatus(${game.GameID}, this.value)">
+                        <option value="Not Started" ${game.ProgressStatus === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                        <option value="In Progress" ${game.ProgressStatus === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                        <option value="Complete" ${game.ProgressStatus === 'Complete' ? 'selected' : ''}>Complete</option>
+                        <option value="Tabled" ${game.ProgressStatus === 'Tabled' ? 'selected' : ''}>Tabled</option>
+                    </select>
+                    <button onclick="deleteGame(${game.GameID})">Delete</button>
+                ` : ''}
+            </div>
+        `;
+
+        // Observe the image for lazy loading
+        const img = gameCard.querySelector('img');
+        if (img) {
+            imageObserver.observe(img);
+        }
+
+        fragment.appendChild(gameCard);
+    }
+    
+    const gameGrid = document.getElementById('game-grid');
+    const sentinel = document.getElementById('sentinel');
+    if (gameGrid && sentinel) {
+        gameGrid.insertBefore(fragment, sentinel);
+    }
+    
+    currentIndex = endIndex;
+
+    // Call the callback if provided
+    if (callback) callback();
 }
 
 // Game Selection Popup Functions
@@ -319,63 +441,6 @@ async function selectGame(game) {
 let currentIndex = 0;
 const BATCH_SIZE = 20;
 
-function renderGames(reset = false) {
-    const gameGrid = document.getElementById('game-grid');
-    if (reset) {
-        gameGrid.innerHTML = '<div id="sentinel"></div>';
-        currentIndex = 0;
-    }
-
-    const filteredGames = filterGames();
-    const endIndex = Math.min(currentIndex + BATCH_SIZE, filteredGames.length);
-    const gamesToRender = filteredGames.slice(currentIndex, endIndex);
-    
-    const fragment = document.createDocumentFragment();
-    
-    gamesToRender.forEach(game => {
-        const gameCard = document.createElement('div');
-        gameCard.className = `game-card status-${game.ProgressStatus.toLowerCase().replace(' ', '-')}`;
-        gameCard.dataset.gameId = game.GameID;
-
-        gameCard.innerHTML = `
-            ${game.ReleaseYear ? `<div class="release-year">${game.ReleaseYear}</div>` : ''}
-            <img src="${game.ImageURL}" 
-                 alt="${game.GameName}" 
-                 class="game-poster"
-                 loading="lazy"
-                 decoding="async"
-                 width="150"
-                 height="225">
-            <div class="game-info">
-                <div class="game-title">${game.GameName}</div>
-                <div class="game-hltb">How Long to Beat: ${game.HowLongToBeat}</div>
-                ${!IS_VIEW_ONLY ? `
-                    <select onchange="updateProgressStatus(${game.GameID}, this.value)">
-                        <option value="Not Started" ${game.ProgressStatus === 'Not Started' ? 'selected' : ''}>Not Started</option>
-                        <option value="In Progress" ${game.ProgressStatus === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                        <option value="Complete" ${game.ProgressStatus === 'Complete' ? 'selected' : ''}>Complete</option>
-                        <option value="Tabled" ${game.ProgressStatus === 'Tabled' ? 'selected' : ''}>Tabled</option>
-                    </select>
-                    <button onclick="deleteGame(${game.GameID})">Delete</button>
-                ` : ''}
-            </div>
-        `;
-
-        fragment.appendChild(gameCard);
-    });
-
-    // Insert before the sentinel
-    const sentinel = document.getElementById('sentinel');
-    gameGrid.insertBefore(fragment, sentinel);
-    currentIndex = endIndex;
-
-    // If we've rendered all games, remove the sentinel
-    if (currentIndex >= filteredGames.length) {
-        sentinel?.remove();
-    }
-}
-
-// Update the filterGames function to use the display options
 function filterGames() {
     let filteredGames = [...games];
     const statusFilter = document.getElementById('statusFilter')?.value;
@@ -471,6 +536,46 @@ function updateDisplayOptions() {
     setCookie('hideTabled', hideTabled, 365);
     
     renderGames(); // Refresh the game display
+}
+
+// Recent Games Panel Functions
+let recentGamesPanel = null;
+let recentGamesList = null;
+
+async function loadRecentGames() {
+    try {
+        const response = await fetch('/recent_games');
+        if (!response.ok) throw new Error('Failed to fetch recent games');
+        
+        const recentGames = await response.json();
+        renderRecentGames(recentGames);
+    } catch (error) {
+        console.error('Error loading recent games:', error);
+        showNotification('Error loading recent games', 'error');
+    }
+}
+
+function renderRecentGames(games) {
+    if (!recentGamesList) return;
+    
+    recentGamesList.innerHTML = games.map(game => `
+        <div class="recent-game-item" onclick="highlightGame(${game.GameID})">
+            <img src="${game.ImageURL}" alt="${game.GameName}">
+            <div class="recent-game-info">
+                <div class="recent-game-title">${game.GameName}</div>
+                <div class="recent-game-status">${game.ProgressStatus}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleRecentGames() {
+    if (!recentGamesPanel) return;
+    
+    recentGamesPanel.classList.toggle('active');
+    if (recentGamesPanel.classList.contains('active')) {
+        loadRecentGames(); // Refresh the list when opening
+    }
 }
 
 // Cookie utilities

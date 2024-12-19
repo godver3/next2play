@@ -1,8 +1,12 @@
 # Use an official Python runtime as the base image
 FROM python:3.9-slim
 
-# Install Node.js
-RUN apt-get update && apt-get install -y nodejs npm
+# Install Node.js and ImageMagick
+RUN apt-get update && apt-get install -y \
+    nodejs \
+    npm \
+    imagemagick \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
 WORKDIR /app

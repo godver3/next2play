@@ -15,6 +15,7 @@
             
             {% if not is_view_only %}
             <div id="game-form">
+                <button id="recentGamesBtn" onclick="toggleRecentGames()">Recently Added</button>
                 <input type="text" id="GameName" name="GameName" placeholder="Enter game name" required>
                 <button onclick="submitGameForm()">Add Game</button>
                 <button onclick="getRandomGame()">Random Game</button>
@@ -26,6 +27,13 @@
             <div class="logout-container">
                 <button onclick="window.location.href='/logout'" class="logout-btn">Logout</button>
             </div>
+        </div>
+    </div>
+
+    <div id="recentGamesPanel" class="recent-games-panel">
+        <div class="recent-games-content">
+            <h3>Recently Added</h3>
+            <div id="recentGamesList"></div>
         </div>
     </div>
 
@@ -101,6 +109,86 @@
             <button onclick="toggleOptionsMenu()">Close</button>
         </div>
     </div>
+
+    <style>
+        .recent-games-panel {
+            position: fixed;
+            left: -300px;
+            top: 0;
+            width: 300px;
+            height: 100%;
+            background: #2c3e50;
+            transition: left 0.3s ease;
+            z-index: 1000;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+        }
+
+        .recent-games-panel.active {
+            left: 0;
+        }
+
+        .recent-games-content {
+            color: white;
+            margin-top: 60px;
+        }
+
+        .recent-game-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .recent-game-item:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .recent-game-item img {
+            width: 50px;
+            height: 75px;
+            object-fit: cover;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+
+        .recent-game-info {
+            flex: 1;
+        }
+
+        .recent-game-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        #recentGamesBtn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #recentGamesBtn:hover {
+            background-color: #2980b9;
+        }
+
+        @media (max-width: 768px) {
+            .recent-games-panel {
+                display: none;
+            }
+            
+            #recentGamesBtn {
+                display: none;
+            }
+        }
+    </style>
 
     <script>
         let games = [

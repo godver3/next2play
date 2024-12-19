@@ -10,6 +10,7 @@ import time
 from howlongtobeatpy import HowLongToBeat
 import os
 from urllib.parse import urlparse
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')  # Change this in production
@@ -17,6 +18,10 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')  # Change 
 # Set up more detailed logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Initialize HLTB client within Flask context
+with app.app_context():
+    hltb_client = HowLongToBeat()
 
 # Authentication decorator
 def login_required(f):
@@ -76,7 +81,7 @@ def save_games(games):
         json.dump(games, f, indent=2)
 
 def download_and_cache_image(image_url, game_id):
-    """Download and cache an image locally"""
+    """Download and cache an image locally with optimization"""
     if not image_url:
         return ''
     
@@ -86,37 +91,132 @@ def download_and_cache_image(image_url, game_id):
     cache_dir = os.path.join('static', 'game_images')
     os.makedirs(cache_dir, exist_ok=True)
     
-    # Get file extension from URL
-    parsed_url = urlparse(image_url)
-    ext = os.path.splitext(parsed_url.path)[1] or '.jpg'
-    
-    # Create local filename
-    local_filename = f'game_{game_id}{ext}'
+    # Always use .jpg for output to ensure consistent format and compression
+    local_filename = f'game_{game_id}.jpg'
     local_path = os.path.join(cache_dir, local_filename)
     relative_path = f'/static/game_images/{local_filename}'
     
-    logging.info(f"Local path will be: {local_path}")
-    
-    # If file doesn't exist, download it
+    # If file doesn't exist, download and optimize it
     if not os.path.exists(local_path):
         try:
+            # Download image to a temporary file
+            temp_path = os.path.join(cache_dir, f'temp_{game_id}')
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://howlongtobeat.com/'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
             response = requests.get(image_url, headers=headers)
-            response.raise_for_status()
-            with open(local_path, 'wb') as f:
-                f.write(response.content)
+            if response.status_code == 200:
+                with open(temp_path, 'wb') as f:
+                    f.write(response.content)
+                
+                # Process the image using ImageMagick
+                subprocess.run([
+                    'convert', temp_path,
+                    '-resize', '400x600>',  # Doubled dimensions for higher quality
+                    '-quality', '95',       # Increased quality
+                    '-strip',               # Remove metadata
+                    '-interlace', 'Plane',  # Progressive loading
+                    local_path
+                ], check=True)
+                
+                logging.info(f"Successfully cached and optimized image for game {game_id}")
+            else:
+                logging.error(f"Failed to download image for game {game_id}: HTTP {response.status_code}")
+                return ''
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error optimizing image: {e}")
+            # If optimization fails, just copy the original
+            os.rename(temp_path, local_path)
         except Exception as e:
-            logging.error(f"Error downloading image {image_url}: {e}")
-            return image_url  # Return original URL if download fails
-    
-    # Return the local path relative to static directory
-    return f'/static/game_images/{local_filename}'
+            logging.error(f"Error caching image for game {game_id}: {str(e)}")
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return ''
+        
+        # Clean up temp file if it exists
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        return relative_path
+    return relative_path
+
+def search_and_cache_game_image(game_name, game_id):
+    """
+    Search for a game's image using HLTB API and cache it locally.
+    Returns the cached image path if successful, empty string otherwise.
+    """
+    try:
+        # Search for the game using HLTB
+        logging.info(f"Searching HLTB for {game_name} (ID: {game_id})")
+        
+        # Create a new HLTB instance if needed
+        try:
+            results = hltb_client.search(game_name)
+        except Exception as e:
+            logging.error(f"Error with existing HLTB client, creating new one: {str(e)}")
+            new_client = HowLongToBeat()
+            results = new_client.search(game_name)
+        
+        if not results:
+            logging.info(f"No results found for {game_name}")
+            return ''
+            
+        # Find the specific game version
+        game_info = next((game for game in results if game.game_id == game_id), results[0])
+        logging.info(f"Selected game: {game_info.game_name} (ID: {game_info.game_id})")
+        
+        # Get the image URL
+        image_url = game_info.game_image_url if hasattr(game_info, 'game_image_url') else None
+        logging.info(f"Raw image URL: {image_url}")
+        
+        if not image_url:
+            logging.info(f"No image URL found for {game_name}")
+            return ''
+            
+        # Add https prefix if needed
+        if not image_url.startswith('http'):
+            image_url = f"https://howlongtobeat.com{image_url}"
+            logging.info(f"Updated image URL: {image_url}")
+            
+        # Download and cache the image
+        return download_and_cache_image(image_url, game_id)
+        
+    except Exception as e:
+        logging.error(f"Error searching for game image {game_name}: {str(e)}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return ''
+
+def update_missing_game_images():
+    """Update images for all games that don't have an image file on disk"""
+    try:
+        games = load_games()
+        updated_count = 0
+        
+        for game in games:
+            image_url = game.get('ImageURL', '')
+            if image_url.startswith('/static/'):
+                # Check if the image file exists
+                image_path = image_url.lstrip('/')
+                if not os.path.exists(image_path):
+                    logging.info(f"Searching for image for {game['GameName']}")
+                    cached_url = search_and_cache_game_image(game['GameName'], game['GameID'])
+                    if cached_url:
+                        game['ImageURL'] = cached_url
+                        updated_count += 1
+                        logging.info(f"Successfully updated image for {game['GameName']}")
+                    else:
+                        logging.error(f"Failed to find image for {game['GameName']}")
+        
+        if updated_count > 0:
+            save_games(games)
+            logging.info(f"Added images for {updated_count} games")
+        
+        return updated_count
+        
+    except Exception as e:
+        logging.error(f"Error updating missing game images: {str(e)}")
+        return 0
 
 @app.route('/')
 @login_required
@@ -160,7 +260,7 @@ def add_game():
         submitted_id = int(data['GameID'])
         
         # Search using the library
-        results = HowLongToBeat().search(search_term)
+        results = hltb_client.search(search_term)
         
         if results:
             # Find the specific game version that was selected
@@ -212,7 +312,8 @@ def add_game():
                     "HowLongToBeat": how_long_to_beat or "Unreleased",
                     "ProgressStatus": "Not Started",
                     "ImageURL": cached_image_url or '',
-                    "ReleaseYear": release_year
+                    "ReleaseYear": release_year,
+                    "DateAdded": datetime.now().isoformat()
                 }
                 
                 logger.info("Saving game with data: %s", new_game)
@@ -259,7 +360,7 @@ def update_games():
                     cached_count += 1
             
             # Check for game updates from HLTB
-            results = HowLongToBeat().search(game['GameName'])
+            results = hltb_client.search(game['GameName'])
             if results and len(results) > 0:
                 game_info = results[0]  # Get the first match
                 needs_update = False
@@ -370,13 +471,13 @@ def search_games():
         logger.debug(f"Searching for term: {search_term}")
         
         # Use the HowLongToBeat library to search
-        results = HowLongToBeat().search(search_term)
+        results = hltb_client.search(search_term)
         
         if results:
             games_data = []
             for game in results:
                 # Fix image URL construction
-                image_url = game.game_image_url
+                image_url = game.game_image_url if hasattr(game, 'game_image_url') else None
                 if image_url and not image_url.startswith('http'):
                     image_url = f"https://howlongtobeat.com{image_url}"
                 
@@ -437,6 +538,89 @@ def stats():
     }
     
     return render_template('stats.html', stats=stats)
+
+@app.route('/recent_games')
+@login_required
+def recent_games():
+    games = load_games()
+    # Sort games by DateAdded (falling back to GameID for older entries that might not have DateAdded)
+    recent = sorted(games, key=lambda x: x.get('DateAdded', ''), reverse=True)[:5]
+    return jsonify(recent)
+
+@app.route('/admin/refetch_images', methods=['POST'])
+@edit_required
+def refetch_images():
+    """Refetch and reprocess all game images from IGDB"""
+    try:
+        # Get all games from the database
+        games = load_games()
+        total = len(games)
+        processed = 0
+        failed = 0
+        
+        for game in games:
+            try:
+                if not game['ImageURL']:
+                    continue
+                    
+                # Construct IGDB image URL
+                image_url = game['ImageURL']
+                
+                # Get the relative and local paths
+                relative_path = os.path.join('game_images', f'game_{game["GameID"]}.jpg')
+                local_path = os.path.join('static', relative_path)
+                
+                # Create game_images directory if it doesn't exist
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                
+                # Download and process the image
+                response = requests.get(image_url, stream=True)
+                if response.status_code == 200:
+                    # Save to temp file first
+                    temp_path = local_path + '.temp'
+                    with open(temp_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Process with ImageMagick
+                    subprocess.run([
+                        'convert', temp_path,
+                        '-resize', '400x600>',
+                        '-quality', '95',
+                        '-strip',
+                        '-interlace', 'Plane',
+                        local_path
+                    ], check=True)
+                    
+                    # Clean up temp file
+                    os.remove(temp_path)
+                    processed += 1
+                    
+                else:
+                    logging.error(f"Failed to download image for game {game['GameID']}: HTTP {response.status_code}")
+                    failed += 1
+                    
+            except Exception as e:
+                logging.error(f"Error processing game {game['GameID']}: {str(e)}")
+                failed += 1
+                continue
+                
+            # Log progress every 10 games
+            if processed % 10 == 0:
+                logging.info(f"Processed {processed}/{total} images")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Processed {processed} images, {failed} failed',
+            'processed': processed,
+            'failed': failed,
+            'total': total
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True, port=5015)
