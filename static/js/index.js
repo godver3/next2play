@@ -570,11 +570,9 @@ function renderRecentGames(games) {
 }
 
 function toggleRecentGames() {
-    if (!recentGamesPanel) return;
-    
-    recentGamesPanel.classList.toggle('active');
-    if (recentGamesPanel.classList.contains('active')) {
-        loadRecentGames(); // Refresh the list when opening
+    if (recentGamesPanel) {
+        recentGamesPanel.classList.toggle('open');
+        loadRecentGames();
     }
 }
 

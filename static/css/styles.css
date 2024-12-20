@@ -577,3 +577,103 @@ button:not([onclick="submitGameForm()"]):not([onclick="getRandomGame()"]):not([o
 .stats-btn:hover {
     background: #0097A7 !important;  /* Darker Teal */
 }
+
+/* Recent Games Panel Styles */
+.recent-games-panel {
+    position: fixed;
+    left: -350px;
+    top: 0;
+    height: 100%;
+    width: 350px;
+    background: #1e1e1e;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease-in-out;
+    z-index: 1000;
+}
+
+.recent-games-panel.open {
+    transform: translateX(350px);
+}
+
+.recent-games-content {
+    padding: 20px;
+    height: 100%;
+    overflow-y: auto;
+    color: #ffffff;
+}
+
+.recent-games-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.recent-games-header h3 {
+    margin: 0;
+    color: #ffffff;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 8px;
+    color: #888;
+}
+
+.close-button:hover {
+    color: #ffffff;
+}
+
+.recent-game-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.recent-game-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.recent-game-item img {
+    width: 50px;
+    height: 75px;
+    object-fit: cover;
+    margin-right: 10px;
+    border-radius: 3px;
+}
+
+.recent-game-info {
+    flex: 1;
+}
+
+.recent-game-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #ffffff;
+}
+
+#recentGamesBtn {
+    background-color: #3498db;
+}
+
+#recentGamesBtn:hover {
+    background-color: #2980b9;
+}
+
+@media (max-width: 768px) {
+    .recent-games-panel {
+        display: none;
+    }
+    
+    #recentGamesBtn {
+        display: none;
+    }
+}
